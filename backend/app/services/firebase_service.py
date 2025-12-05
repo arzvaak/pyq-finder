@@ -40,7 +40,8 @@ class FirebaseService:
             'storageBucket': 'pyqfinder.firebasestorage.app'
         })
         
-        self.db = firestore.client()
+        # Use the pyq-finder database (not default)
+        self.db = firestore.client(database_id='pyq-finder')
         self.bucket = storage.bucket()
         self.papers_collection = self.db.collection('papers')
     
