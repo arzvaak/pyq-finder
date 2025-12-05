@@ -197,6 +197,33 @@ class FirebaseService:
         query = self.papers_collection.where('pdf_url', '==', pdf_url).limit(1)
         return len(list(query.stream())) > 0
     
+    def paper_exists_by_metadata(
+        self, 
+        subject_code: str, 
+        year: str, 
+        semester: str,
+        exam_type: str = None
+    ) -> bool:
+        """
+        Check if a paper with similar metadata exists.
+        This catches duplicates even if the PDF URL is slightly different.
+        
+        Matches on: subject_code + year + semester + exam_type (if provided)
+        """
+        if not subject_code or not year:
+            return False
+        
+        query = self.papers_collection.where('subject_code', '==', subject_code)
+        query = query.where('year', '==', year)
+        
+        if semester:
+            query = query.where('semester', '==', semester)
+        
+        if exam_type:
+            query = query.where('exam_type', '==', exam_type)
+        
+        return len(list(query.limit(1).stream())) > 0
+    
     def get_unique_values(self, field: str) -> List[str]:
         """Get unique values for a field (year, semester, branch, etc.)."""
         values = set()

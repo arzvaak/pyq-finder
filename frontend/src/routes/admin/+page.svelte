@@ -3,8 +3,10 @@
 
     interface ScrapeStatus {
         is_running: boolean;
+        stop_requested: boolean;
         portal: string | null;
         progress: number;
+        skipped: number;
         total: number;
         errors: string[];
         message: string;
@@ -12,8 +14,10 @@
 
     let scrapeStatus = $state<ScrapeStatus>({
         is_running: false,
+        stop_requested: false,
         portal: null,
         progress: 0,
+        skipped: 0,
         total: 0,
         errors: [],
         message: "",
@@ -135,16 +139,26 @@
             </div>
         {/if}
 
-        {#if scrapeStatus.progress > 0}
+        {#if scrapeStatus.progress > 0 || scrapeStatus.skipped > 0}
             <div class="mb-4">
                 <div class="flex justify-between text-sm text-slate-400 mb-1">
                     <span>Progress</span>
-                    <span>{scrapeStatus.progress} papers scraped</span>
+                    <span>
+                        {scrapeStatus.progress} saved
+                        {#if scrapeStatus.skipped > 0}
+                            <span class="text-yellow-400"
+                                >• {scrapeStatus.skipped} skipped</span
+                            >
+                        {/if}
+                    </span>
                 </div>
                 <div class="h-2 bg-white/5 rounded-full overflow-hidden">
                     <div
                         class="h-full bg-gradient-to-r from-primary-500 to-accent-500 rounded-full transition-all duration-300"
-                        style="width: {Math.min(100, scrapeStatus.progress)}%"
+                        style="width: {Math.min(
+                            100,
+                            scrapeStatus.progress + scrapeStatus.skipped,
+                        )}%"
                     ></div>
                 </div>
             </div>
