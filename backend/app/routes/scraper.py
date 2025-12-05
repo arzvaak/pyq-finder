@@ -6,6 +6,10 @@ from app.services.portal2_scraper import Portal2Scraper
 
 scraper_bp = Blueprint('scraper', __name__)
 
+# Global scraper reference for stop functionality
+_current_scraper = None
+_scraper_lock = threading.Lock()
+
 # Track scraping status with stop event
 scrape_status = {
     'is_running': False,
@@ -36,7 +40,7 @@ def run_scrape(portal: str, years: list = None, upload_to_storage: bool = False,
     1. Checks if exact PDF URL already exists
     2. Checks if similar paper exists (same subject_code + year + semester)
     """
-    global scrape_status
+    global scrape_status, _current_scraper
     
     scrape_status['is_running'] = True
     scrape_status['stop_requested'] = False
@@ -44,16 +48,20 @@ def run_scrape(portal: str, years: list = None, upload_to_storage: bool = False,
     scrape_status['progress'] = 0
     scrape_status['skipped'] = 0
     scrape_status['errors'] = []
-    scrape_status['message'] = f'Starting scrape for {portal} with {workers} workers...'
+    scrape_status['message'] = f'Starting scrape for {portal}...'
     
     scraper = None
     
     try:
         if portal == 'portal1':
             scraper = Portal1Scraper(max_workers=workers)
+            with _scraper_lock:
+                _current_scraper = scraper
             papers_generator = scraper.scrape_all(concurrent=True)
         elif portal == 'portal2':
             scraper = Portal2Scraper(headless=True)
+            with _scraper_lock:
+                _current_scraper = scraper
             papers_generator = scraper.scrape_all(years=years)
         else:
             scrape_status['message'] = f'Unknown portal: {portal}'
@@ -120,6 +128,8 @@ def run_scrape(portal: str, years: list = None, upload_to_storage: bool = False,
     finally:
         scrape_status['is_running'] = False
         scrape_status['stop_requested'] = False
+        with _scraper_lock:
+            _current_scraper = None
 
 
 @scraper_bp.route('/scrape', methods=['POST'])
@@ -188,7 +198,7 @@ def get_scrape_status():
 @scraper_bp.route('/scrape/stop', methods=['POST'])
 def stop_scrape():
     """Stop the current scrape."""
-    global scrape_status
+    global scrape_status, _current_scraper
     
     if not scrape_status['is_running']:
         return jsonify({
@@ -200,7 +210,12 @@ def stop_scrape():
     scrape_status['stop_requested'] = True
     scrape_status['message'] = 'Stopping...'
     
+    # Also signal the scraper directly if it exists
+    with _scraper_lock:
+        if _current_scraper and hasattr(_current_scraper, 'stop'):
+            _current_scraper.stop()
+    
     return jsonify({
         'success': True,
-        'message': 'Stop requested - scraper will stop after current paper'
+        'message': 'Stop requested - scraper will stop after current operation'
     })
