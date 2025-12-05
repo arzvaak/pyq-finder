@@ -1,0 +1,35 @@
+<script type="module">
+
+  // Import the functions you need from the SDKs you need
+
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+
+  // TODO: Add SDKs for Firebase products that you want to use
+
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+
+  // Your web app's Firebase configuration
+
+  const firebaseConfig = {
+
+    apiKey: "AIzaSyBBRm1Qr47WwmqZ7pnUjl--dIKAGjuoLVo",
+
+    authDomain: "pyqfinder.firebaseapp.com",
+
+    projectId: "pyqfinder",
+
+    storageBucket: "pyqfinder.firebasestorage.app",
+
+    messagingSenderId: "450221753604",
+
+    appId: "1:450221753604:web:216e0799b6b5afa5e7bc51"
+
+  };
+
+
+  // Initialize Firebase
+
+  const app = initializeApp(firebaseConfig);
+
+</script>
