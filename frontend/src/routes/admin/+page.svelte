@@ -26,6 +26,7 @@
     let selectedPortal = $state("portal1");
     let selectedYears = $state<string[]>([]);
     let uploadToStorage = $state(false);
+    let workers = $state(5);
     let statusInterval: number | null = null;
 
     const API_URL = "http://localhost:5000/api";
@@ -62,6 +63,7 @@
                     portal: selectedPortal,
                     years: selectedYears.length > 0 ? selectedYears : null,
                     upload_to_storage: uploadToStorage,
+                    workers: workers,
                 }),
             });
 
@@ -291,6 +293,30 @@
                         </div>
                     </div>
                 </label>
+
+                <!-- Concurrent Workers Slider -->
+                <div class="p-3 bg-white/5 rounded-lg mb-3">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-white font-medium"
+                            >Concurrent Workers</span
+                        >
+                        <span class="text-primary-400 font-bold">{workers}</span
+                        >
+                    </div>
+                    <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        bind:value={workers}
+                        class="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div
+                        class="flex justify-between text-xs text-slate-500 mt-1"
+                    >
+                        <span>Slower</span>
+                        <span>Faster (more parallel requests)</span>
+                    </div>
+                </div>
 
                 {#if selectedPortal === "portal2" || selectedPortal === "both"}
                     <div>

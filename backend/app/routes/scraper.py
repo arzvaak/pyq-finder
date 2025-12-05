@@ -19,12 +19,18 @@ scrape_status = {
 }
 
 
-def run_scrape(portal: str, years: list = None, upload_to_storage: bool = False):
+def run_scrape(portal: str, years: list = None, upload_to_storage: bool = False, workers: int = 5):
     """
     Background task to run scraping.
     
     By default, only stores PDF links (not the actual files).
     This is faster and doesn't use storage space.
+    
+    Args:
+        portal: 'portal1' or 'portal2'
+        years: Optional list of years to filter (for portal2)
+        upload_to_storage: Whether to upload PDFs to Firebase Storage
+        workers: Number of concurrent workers (default 5, for portal1)
     
     Duplicate detection:
     1. Checks if exact PDF URL already exists
@@ -38,12 +44,14 @@ def run_scrape(portal: str, years: list = None, upload_to_storage: bool = False)
     scrape_status['progress'] = 0
     scrape_status['skipped'] = 0
     scrape_status['errors'] = []
-    scrape_status['message'] = f'Starting scrape for {portal}...'
+    scrape_status['message'] = f'Starting scrape for {portal} with {workers} workers...'
+    
+    scraper = None
     
     try:
         if portal == 'portal1':
-            scraper = Portal1Scraper()
-            papers_generator = scraper.scrape_all()
+            scraper = Portal1Scraper(max_workers=workers)
+            papers_generator = scraper.scrape_all(concurrent=True)
         elif portal == 'portal2':
             scraper = Portal2Scraper(headless=True)
             papers_generator = scraper.scrape_all(years=years)
@@ -123,6 +131,7 @@ def start_scrape():
         - portal: 'portal1' or 'portal2' or 'both'
         - years: Optional list of years (for portal2)
         - upload_to_storage: Whether to upload PDFs to Firebase Storage (default false)
+        - workers: Number of concurrent workers (1-10, default 5)
     """
     global scrape_status
     
@@ -137,6 +146,7 @@ def start_scrape():
     portal = data.get('portal', 'portal1')
     years = data.get('years')
     upload_to_storage = data.get('upload_to_storage', False)
+    workers = min(max(int(data.get('workers', 5)), 1), 10)  # Clamp between 1-10
     
     if portal not in ['portal1', 'portal2', 'both']:
         return jsonify({
@@ -148,13 +158,13 @@ def start_scrape():
     if portal == 'both':
         # Run both sequentially
         def run_both():
-            run_scrape('portal1', years, upload_to_storage)
+            run_scrape('portal1', years, upload_to_storage, workers)
             if not scrape_status['stop_requested']:
-                run_scrape('portal2', years, upload_to_storage)
+                run_scrape('portal2', years, upload_to_storage, workers)
         
         thread = threading.Thread(target=run_both)
     else:
-        thread = threading.Thread(target=run_scrape, args=(portal, years, upload_to_storage))
+        thread = threading.Thread(target=run_scrape, args=(portal, years, upload_to_storage, workers))
     
     thread.daemon = True
     thread.start()

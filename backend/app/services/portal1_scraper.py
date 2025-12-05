@@ -4,6 +4,8 @@ import requests
 from bs4 import BeautifulSoup
 from typing import List, Dict, Generator
 from urllib.parse import urljoin, unquote
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 from app.models.paper import Paper
 
@@ -13,18 +15,31 @@ class Portal1Scraper:
     Scraper for https://mitmpllibportal.manipal.edu/question-papers
     
     This portal has a flat list of PDF links organized by year/semester/branch.
+    Supports concurrent scraping for faster performance.
     """
     
     BASE_URL = "https://mitmpllibportal.manipal.edu/question-papers"
     
-    def __init__(self):
+    def __init__(self, max_workers: int = 5):
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
+        self.max_workers = max_workers
+        self._stop_event = threading.Event()
     
-    def scrape_all(self) -> Generator[Paper, None, None]:
-        """Scrape all papers from Portal 1."""
+    def stop(self):
+        """Signal the scraper to stop."""
+        self._stop_event.set()
+    
+    def scrape_all(self, concurrent: bool = True) -> Generator[Paper, None, None]:
+        """
+        Scrape all papers from Portal 1.
+        
+        Args:
+            concurrent: If True, use parallel processing for faster scraping
+        """
+        self._stop_event.clear()
         print(f"[Portal1] Starting scrape from {self.BASE_URL}")
         
         response = self.session.get(self.BASE_URL, timeout=30)
@@ -36,15 +51,59 @@ class Portal1Scraper:
         pdf_links = soup.find_all('a', href=lambda x: x and x.endswith('.pdf'))
         print(f"[Portal1] Found {len(pdf_links)} PDF links")
         
-        for link in pdf_links:
+        if concurrent and len(pdf_links) > 10:
+            # Use concurrent processing for large batches
+            yield from self._scrape_concurrent(pdf_links)
+        else:
+            # Sequential processing for small batches
+            for link in pdf_links:
+                if self._stop_event.is_set():
+                    print("[Portal1] Stop requested, stopping...")
+                    break
+                try:
+                    paper = self._parse_pdf_link(link)
+                    if paper:
+                        yield paper
+                except Exception as e:
+                    print(f"[Portal1] Error parsing link: {e}")
+                    continue
+    
+    def _scrape_concurrent(self, pdf_links) -> Generator[Paper, None, None]:
+        """Process PDF links concurrently using ThreadPoolExecutor."""
+        papers_queue = []
+        
+        def process_link(link):
+            if self._stop_event.is_set():
+                return None
             try:
-                paper = self._parse_pdf_link(link)
-                if paper:
-                    yield paper
-                    time.sleep(0.1)  # Be respectful
+                return self._parse_pdf_link(link)
             except Exception as e:
                 print(f"[Portal1] Error parsing link: {e}")
-                continue
+                return None
+        
+        # Process in batches to allow yielding results progressively
+        batch_size = self.max_workers * 2
+        
+        for i in range(0, len(pdf_links), batch_size):
+            if self._stop_event.is_set():
+                print("[Portal1] Stop requested, stopping...")
+                break
+            
+            batch = pdf_links[i:i + batch_size]
+            
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                futures = {executor.submit(process_link, link): link for link in batch}
+                
+                for future in as_completed(futures):
+                    if self._stop_event.is_set():
+                        break
+                    
+                    paper = future.result()
+                    if paper:
+                        yield paper
+            
+            # Small delay between batches to be respectful
+            time.sleep(0.2)
     
     def _parse_pdf_link(self, link) -> Paper:
         """Parse a PDF link and extract metadata."""
