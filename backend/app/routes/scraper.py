@@ -17,8 +17,13 @@ scrape_status = {
 }
 
 
-def run_scrape(portal: str, years: list = None, upload_to_storage: bool = True):
-    """Background task to run scraping."""
+def run_scrape(portal: str, years: list = None, upload_to_storage: bool = False):
+    """
+    Background task to run scraping.
+    
+    By default, only stores PDF links (not the actual files).
+    This is faster and doesn't use storage space.
+    """
     global scrape_status
     
     scrape_status['is_running'] = True
@@ -47,7 +52,7 @@ def run_scrape(portal: str, years: list = None, upload_to_storage: bool = True):
                     scrape_status['message'] = f'Skipping existing: {paper.title}'
                     continue
                 
-                # Upload PDF to storage if requested
+                # Optionally upload PDF to storage (disabled by default)
                 if upload_to_storage:
                     try:
                         storage_path = f"papers/{portal}/{paper.year}/{paper.branch}/{paper.title}.pdf"
@@ -56,9 +61,8 @@ def run_scrape(portal: str, years: list = None, upload_to_storage: bool = True):
                         scrape_status['message'] = f'Uploaded: {paper.title}'
                     except Exception as e:
                         scrape_status['errors'].append(f'Upload failed for {paper.title}: {str(e)}')
-                        # Still save the paper without storage URL
                 
-                # Save paper to Firestore
+                # Save paper metadata to Firestore (includes the original PDF link)
                 firebase_service.add_paper(paper)
                 count += 1
                 scrape_status['progress'] = count

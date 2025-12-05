@@ -21,7 +21,7 @@
 
     let selectedPortal = $state("portal1");
     let selectedYears = $state<string[]>([]);
-    let uploadToStorage = $state(true);
+    let uploadToStorage = $state(false);
     let statusInterval: number | null = null;
 
     const API_URL = "http://localhost:5000/api";
@@ -248,10 +248,10 @@
                     />
                     <div>
                         <div class="text-white font-medium">
-                            Upload to Firebase Storage
+                            Upload PDFs to Storage (Optional)
                         </div>
                         <div class="text-slate-400 text-sm">
-                            Store PDFs for faster downloads
+                            Leave unchecked to just save links (recommended)
                         </div>
                     </div>
                 </label>
@@ -356,7 +356,8 @@
                     >4</span
                 >
                 <span
-                    >PDFs are uploaded to Firebase Storage for fast downloads</span
+                    >Click any paper to download directly from the library
+                    portal</span
                 >
             </li>
         </ul>
