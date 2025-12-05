@@ -8,3 +8,4 @@ webdriver-manager>=4.0.0
 python-dotenv>=1.0.0
 gunicorn>=21.0.0
 lxml>=4.9.0
+rapidfuzz>=3.5.0

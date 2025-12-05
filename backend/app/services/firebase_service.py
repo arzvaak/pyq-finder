@@ -120,6 +120,77 @@ class FirebaseService:
         
         return papers
     
+    def fuzzy_search_papers(self, subject_names: List[str], threshold: int = 60, limit: int = 100) -> List[dict]:
+        """
+        Find papers matching subject names using fuzzy string matching.
+        
+        Args:
+            subject_names: List of subject names to search for
+            threshold: Minimum similarity score (0-100) to include a match
+            limit: Maximum number of results to return
+            
+        Returns:
+            List of papers with similarity scores, sorted by best match
+        """
+        from rapidfuzz import fuzz, process
+        
+        # Fetch all papers (in production, consider caching or indexing)
+        all_papers = []
+        for doc in self.papers_collection.stream():
+            data = doc.to_dict()
+            data['id'] = doc.id
+            all_papers.append(data)
+        
+        if not all_papers:
+            return []
+        
+        # Build searchable text for each paper
+        paper_texts = []
+        for paper in all_papers:
+            # Combine subject_name, title, and subject_code for matching
+            text = f"{paper.get('subject_name', '')} {paper.get('title', '')} {paper.get('subject_code', '')}"
+            paper_texts.append(text.lower())
+        
+        # Find matches for each subject
+        matched_papers = {}
+        
+        for subject in subject_names:
+            subject_lower = subject.lower()
+            
+            for i, (paper, text) in enumerate(zip(all_papers, paper_texts)):
+                paper_id = paper['id']
+                
+                # Calculate similarity using multiple methods
+                # Token set ratio works well for subject names with different word orders
+                ratio = fuzz.token_set_ratio(subject_lower, text)
+                
+                # Also check partial ratio for substring matches
+                partial = fuzz.partial_ratio(subject_lower, text)
+                
+                # Use the higher score
+                score = max(ratio, partial)
+                
+                if score >= threshold:
+                    if paper_id not in matched_papers or matched_papers[paper_id]['score'] < score:
+                        matched_papers[paper_id] = {
+                            **paper,
+                            'score': score,
+                            'matched_subject': subject
+                        }
+        
+        # Sort by score (highest first) and return top results
+        results = sorted(matched_papers.values(), key=lambda x: x['score'], reverse=True)
+        return results[:limit]
+    
+    def get_all_papers_for_search(self) -> List[dict]:
+        """Get all papers for client-side searching."""
+        papers = []
+        for doc in self.papers_collection.stream():
+            data = doc.to_dict()
+            data['id'] = doc.id
+            papers.append(data)
+        return papers
+    
     def paper_exists(self, pdf_url: str) -> bool:
         """Check if a paper with the given PDF URL already exists."""
         query = self.papers_collection.where('pdf_url', '==', pdf_url).limit(1)

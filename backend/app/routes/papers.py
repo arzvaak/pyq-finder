@@ -128,3 +128,49 @@ def get_filters():
             'success': False,
             'error': str(e)
         }), 500
+
+
+@papers_bp.route('/papers/find-by-subjects', methods=['POST'])
+def find_papers_by_subjects():
+    """
+    Find papers matching a list of subject names using fuzzy search.
+    
+    Body:
+        - subjects: List of subject names to search for
+        - threshold: Minimum similarity score (0-100), default 60
+        - limit: Maximum results to return, default 100
+    
+    Returns papers sorted by match quality with similarity scores.
+    """
+    try:
+        data = request.get_json() or {}
+        subjects = data.get('subjects', [])
+        threshold = int(data.get('threshold', 60))
+        limit = int(data.get('limit', 100))
+        
+        if not subjects:
+            return jsonify({
+                'success': False,
+                'error': 'No subjects provided'
+            }), 400
+        
+        # Perform fuzzy search
+        results = firebase_service.fuzzy_search_papers(
+            subject_names=subjects,
+            threshold=threshold,
+            limit=limit
+        )
+        
+        return jsonify({
+            'success': True,
+            'data': results,
+            'count': len(results),
+            'searched_subjects': subjects
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
